@@ -25,6 +25,12 @@ CONFIG_SECTION_MQTT = 'mqtt'
 CONFIG_MQTT_HOST = 'host'
 CONFIG_MQTT_PORT = 'port'
 
+CONFIG_SECTION_LDAP = 'ldap'
+CONFIG_LDAP_URL = 'url'
+CONFIG_LDAP_BINDDN = 'binddn'
+CONFIG_LDAP_BINDPW = 'bindpw'
+CONFIG_LDAP_SEARCH_BASE = 'search_base'
+
 EVENT_KEYPRESS = 'keypress'
 EVENT_CARDREAD = 'cardread'
 EVENT_TAMPER = 'tamper'
