@@ -44,7 +44,7 @@ def log(txt):
 
 
 def check_card(zone, card_number):
-    unix_epoch_day = int(time.time()) / (24*60*60)
+    unix_epoch_day = int(time.time()) / (24 * 60 * 60)
 
     server = ldap3.Server(hosturl)
     connection = ldap3.Connection(
@@ -68,18 +68,18 @@ def check_card(zone, card_number):
 
 
 class LDAPAuthPlugin(EnterpriseAuthPlugin):
-        def __init__(self):
-                super(LDAPAuthPlugin, self).__init__()
-                self.name = 'LDAP connector'
+    def __init__(self):
+        super(LDAPAuthPlugin, self).__init__()
+        self.name = 'LDAP connector'
 
-        def on_cardread(self, zoneid, cardcode):
-                retval = check_card(zoneid, cardcode)
+    def on_cardread(self, zoneid, cardcode):
+        retval = check_card(zoneid, cardcode)
 
-                if retval:
-                        self.accept(zoneid)
-                else:
-                        self.reject(zoneid)
+        if retval:
+            self.accept(zoneid)
+        else:
+            self.reject(zoneid)
 
 
 if __name__ == '__main__':
-        main(LDAPAuthPlugin)
+    main(LDAPAuthPlugin)

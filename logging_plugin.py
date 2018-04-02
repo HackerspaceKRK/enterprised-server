@@ -23,21 +23,23 @@ from auth_plugin import EnterpriseAuthPlugin, main
 
 syslog.openlog("zamek_auth", 0, 128)
 
+
 def log(txt):
-	syslog.syslog(txt.encode("utf-8"))
-	print(txt.encode("utf-8"))
+    syslog.syslog(txt.encode("utf-8"))
+    print(txt.encode("utf-8"))
 
 
 class LoggingPlugin(EnterpriseAuthPlugin):
-	def __init__(self):
-		super(LoggingPlugin, self).__init__()
-		self.name = 'Plugin that log everything to syslog'
+    def __init__(self):
+        super(LoggingPlugin, self).__init__()
+        self.name = 'Plugin that log everything to syslog'
 
-	def on_action(self, zoneid, action):
-		log('{}: {}'.format(zoneid, action))
+    def on_action(self, zoneid, action):
+        log('{}: {}'.format(zoneid, action))
 
-	def on_cardread(self, zoneid, cardcode):
-		log('{}: scan: {}'.format(zoneid, cardcode))
+    def on_cardread(self, zoneid, cardcode):
+        log('{}: scan: {}'.format(zoneid, cardcode))
+
 
 if __name__ == '__main__':
-	main(LoggingPlugin)
+    main(LoggingPlugin)

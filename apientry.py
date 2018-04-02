@@ -21,65 +21,69 @@ from auth_plugin import EnterpriseAuthPlugin, main
 
 import sys
 import syslog
+
 sys.path.append("/opt/skladki")
 import skladki_lib
 
 syslog.openlog("zamek_auth_plugin", 0, 128)
 
+
 def log(txt):
-	syslog.syslog(txt.encode("utf-8"))
-	print(txt.encode("utf-8"))
+    syslog.syslog(txt.encode("utf-8"))
+    print(txt.encode("utf-8"))
+
 
 def check_card_api(card_number):
-	api = skladki_lib.SkladkiAPI()
-	api.connect()
-	user = api.getUserByCard(card_number)
-	if user is None:
-		log('No card in database')
-		return False
+    api = skladki_lib.SkladkiAPI()
+    api.connect()
+    user = api.getUserByCard(card_number)
+    if user is None:
+        log('No card in database')
+        return False
 
-	if user.active:
-		log(u"User {0} auth succeed".format(user.getLongName()))
-		return True
-	else:
-		log(u"User {0} card is not active".format(user.getLongName()))
-		return False
+    if user.active:
+        log(u"User {0} auth succeed".format(user.getLongName()))
+        return True
+    else:
+        log(u"User {0} card is not active".format(user.getLongName()))
+        return False
+
 
 def check_card(card_number):
-	if check_card_api(card_number):
-		return True
+    if check_card_api(card_number):
+        return True
 
-	with file('karty.txt', 'r') as f:
-		for line in f:
-			number = line.strip()
+    with file('karty.txt', 'r') as f:
+        for line in f:
+            number = line.strip()
 
-			if len(number) == 0:
-				continue
+            if len(number) == 0:
+                continue
 
-			if number[0] == ';':
-				continue
+            if number[0] == ';':
+                continue
 
-			number, comment = map(lambda x: x.strip(), number.split(':'))
+            number, comment = map(lambda x: x.strip(), number.split(':'))
 
-			if card_number == number:
-				return True
+            if card_number == number:
+                return True
 
-	return False
+    return False
 
 
 class SkladkiAPIAuthPlugin(EnterpriseAuthPlugin):
-	def __init__(self):
-		super(SkladkiAPIAuthPlugin, self).__init__()
-		self.name = 'Connector for old system'
+    def __init__(self):
+        super(SkladkiAPIAuthPlugin, self).__init__()
+        self.name = 'Connector for old system'
 
-	def on_cardread(self, zoneid, cardcode):
-		retval = check_card(cardcode)
+    def on_cardread(self, zoneid, cardcode):
+        retval = check_card(cardcode)
 
-		if retval:
-			self.accept(zoneid)
-		else:
-			self.reject(zoneid)
+        if retval:
+            self.accept(zoneid)
+        else:
+            self.reject(zoneid)
 
 
 if __name__ == '__main__':
-	main(SkladkiAPIAuthPlugin)
+    main(SkladkiAPIAuthPlugin)
