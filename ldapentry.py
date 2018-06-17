@@ -23,7 +23,11 @@ import sys
 import syslog
 import time
 import ldap3
-import ConfigParser
+
+try:
+    import ConfigParser
+except ImportError:
+    import configparser as ConfigParser
 
 from constants import *
 
@@ -35,17 +39,66 @@ binddn = config_file.get(CONFIG_SECTION_LDAP, CONFIG_LDAP_BINDDN)
 bindpw = config_file.get(CONFIG_SECTION_LDAP, CONFIG_LDAP_BINDPW)
 search_base = config_file.get(CONFIG_SECTION_LDAP, CONFIG_LDAP_SEARCH_BASE)
 
-syslog.openlog("zamek_auth", 0, 128)
+hsowicz_group = 'cn=members,cn=groups,cn=accounts,dc=at,dc=hskrk,dc=pl'
+ryjek_group = 'cn=ryjek,cn=groups,cn=accounts,dc=at,dc=hskrk,dc=pl'
+ryjek_access = [
+    'outdoor',
+    'indoor',
+    'magazynek'
+]
 
+syslog.openlog("zamek_auth", 0, 128)
 
 def log(txt):
     syslog.syslog(txt.encode("utf-8"))
     print(txt.encode("utf-8"))
 
+def get_user_by_card(connection, card_number):
+    result = connection.search(
+        search_base=search_base,
+        search_filter="(uniqueCardId=%s)" % (card_number),
+        attributes=[
+            'uid',
+            'memberOf',
+            'membershipExpiration'
+        ]
+    )
+    if len(connection.entries) == 1:
+        return connection.entries[0]
+    else:
+        return None
+
+def get_user_by_uid(connection, uid):
+    result = connection.search(
+        search_base=search_base,
+        search_filter="(uid=%s)" % (uid),
+        attributes=[
+            'uid',
+            'memberOf',
+            'membershipExpiration'
+        ]
+    )
+    if len(connection.entries) == 1:
+        return connection.entries[0]
+    else:
+        return None
+
+def unix_epoch_day():
+    return int(time.time()) / (24 * 60 * 60)
+
+def check_ryjek(connection):
+    entry = get_user_by_uid(connection, 'wbielak')
+    if entry:
+        return check_hsowicz(entry)
+    else:
+        return False
+
+def check_hsowicz(entry):
+    expiration = int(entry.membershipExpiration.value)
+    return expiration >= unix_epoch_day()
+
 
 def check_card(zone, card_number):
-    unix_epoch_day = int(time.time()) / (24 * 60 * 60)
-
     server = ldap3.Server(hosturl)
     connection = ldap3.Connection(
         server, auto_bind=True, client_strategy=ldap3.SYNC,
@@ -53,18 +106,19 @@ def check_card(zone, card_number):
         authentication=ldap3.SIMPLE, check_names=True
     )
 
-    result = connection.search(
-        search_base=search_base,
-        search_filter="(&(uniqueCardID=%s)(shadowInactive>=%d))" % (card_number, unix_epoch_day)
-    )
+    entry = get_user_by_card(connection, card_number)
 
-    if len(connection.entries) == 1:
-        entry = connection.entries[0]
-        uid = entry.entry_dn.split(',')[0].split('=')[1]
-        log("%s: %s is comming!" % (zone, uid))
-        return True
-    else:
-        return False
+    name = None
+    result = False
+
+    if entry:
+        name = entry.uid.value
+        if hsowicz_group in entry.memberOf:
+            result |= check_hsowicz(entry)
+        if ryjek_group in entry.memberOf and zone in ryjek_access:
+            result |= check_ryjek(connection)
+
+    return name, result
 
 
 class LDAPAuthPlugin(EnterpriseAuthPlugin):
@@ -73,13 +127,17 @@ class LDAPAuthPlugin(EnterpriseAuthPlugin):
         self.name = 'LDAP connector'
 
     def on_cardread(self, zoneid, cardcode):
-        retval = check_card(zoneid, cardcode)
-
-        if retval:
-            self.accept(zoneid)
-        else:
+        name, result = check_card(zoneid, cardcode)
+        if not name:
+            log('rejected unknown card %s for zone %s' % (cardcode, zoneid))
             self.reject(zoneid)
-
+        else:
+            if result:
+                log('accepted card %s (%s) for zone %s' % (cardcode, name, zoneid))
+                self.accept(zoneid)
+            else:
+                log('rejected card %s (%s) for zone %s' % (cardcode, name, zoneid))
+                self.reject(zoneid)
 
 if __name__ == '__main__':
     main(LDAPAuthPlugin)
